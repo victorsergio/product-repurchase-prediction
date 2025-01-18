@@ -1,3 +1,5 @@
+import pdb
+
 from transformer import Transformer
 from transformer_dataset import TransformerDataset
 from torch.utils.data import DataLoader
@@ -14,13 +16,15 @@ import time
 import configparser
 from utils import save_to_json
 
+from utils import setup_logger
+
 
 class TrainModel:
 
     def __init__(self):
 
-        self.base_path = "/home/pv10123z/mldm-project/"
-        #self.base_path = "/Users/victor.penaloza/Documents/mldm-project/"
+        self.base_path = "/content/drive/MyDrive/MLDM-PROJ/"
+       
         self.data_dir = "data/train"
         self.config_path = os.path.join(self.base_path, "config.ini")
         self.save_model_dir = "out"
@@ -28,29 +32,27 @@ class TrainModel:
         self.save_model_path = os.path.join(self.base_path, self.save_model_dir, self.start_timestamp)
         self.reload_model_path = os.path.join(self.base_path, self.save_model_dir,
                                               "12-12-2024_20-41-04")  # used for retraining a model
-
-        self.log_path = os.path.join(self.base_path, self.save_model_dir, self.start_timestamp, "log.txt")
+        self.log_dir = "logs"
+        self.log_path = os.path.join(self.base_path, self.log_dir, f"{self.start_timestamp}_training.log")
 
         # Create a new directory for this experiment run
         os.makedirs(self.save_model_path, exist_ok=True)
 
-        logging.basicConfig(filename=self.log_path, filemode='a', level=logging.INFO,
-                            format="%(asctime)s [%(levelname)s] %(name)s %(message)s", datefmt="[%Y-%m-%d %H:%M:%S]")
-        self.logger = logging.getLogger(__name__)
+        self.logger = setup_logger(self.log_path, to_console=False, logger_name=__name__)
 
         self.model_config = {
-            "n_encoder_layers": 1,
-            "input_size": 384,
+            "n_encoder_layers": 8,
+            "input_size": 200,
             "dim_val": 512,
             "dropout_encoder": 0.2,
             "dropout_pos_enc": 0.1,
             "n_heads": 8,
-            "num_predicted_features": 384,
+            "num_predicted_features": 200,
             "max_seq_len": 3
         }
 
         self.training_config = {
-            "epochs": 10000,
+            "epochs": 200,
             "batch_size": 64,
             "save_model_path": self.save_model_path,
             "device": "cuda",
@@ -60,8 +62,8 @@ class TrainModel:
         # Save current experiment configs to files
         save_to_json({"model_config": self.model_config, "training_config": self.training_config}, self.save_model_path)
 
-        self.historic_path = os.path.join(self.base_path, self.data_dir, "historic_T3_V384_P1.pkl")
-        self.next_path = os.path.join(self.base_path, self.data_dir, "next_V384_P1.pkl")
+        self.historic_path = os.path.join(self.base_path, self.data_dir, "X_V200_P1.pkl")
+        self.next_path = os.path.join(self.base_path, self.data_dir, "y_V200_P1.pkl")
 
         self.config = configparser.ConfigParser()
         self.config.read(self.config_path)
@@ -148,7 +150,7 @@ class TrainModel:
 
             # Training Loop
             model.train()
-            for _input, target in train_dataloader:
+            for _input, target, *_ in train_dataloader:
                 optimizer.zero_grad()
 
                 src = _input.double().to(device)
@@ -165,7 +167,7 @@ class TrainModel:
             # Validation Loop
             model.eval()
             with torch.no_grad():
-                for _input, target in val_dataloader:
+                for _input, target, *_ in val_dataloader:
                     src = _input.double().to(device)
                     target = target.double().to(device)
 
